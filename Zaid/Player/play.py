@@ -1,4 +1,4 @@
-# © TeamRaichu
+# © SUPERIOR_BOTS
 import io
 from os import path
 from typing import Callable
@@ -6,7 +6,7 @@ from asyncio.queues import QueueEmpty
 import os
 import random
 import re
-
+from random import choice
 import aiofiles
 import aiohttp
 from Zaid.converter import convert
@@ -14,20 +14,27 @@ import ffmpeg
 import requests
 from Zaid.fonts import CHAT_TITLE
 from PIL import Image, ImageDraw, ImageFont
-from config import ASSISTANT_NAME, BOT_USERNAME, IMG_1, IMG_2, IMG_5, GROUP_SUPPORT, UPDATES_CHANNEL
+from config import ASSISTANT_NAME, BOT_USERNAME, IMG_1, IMG_2, IMG_5, UPDATES_CHANNEL, GROUP_SUPPORT
 from Zaid.filters import command, other_filters
 from Zaid.queues import QUEUE, add_to_queue
-from Zaid.main import call_py, user
+from Zaid.main import call_py, Test as user, call_py2, call_py3, call_py4, call_py5
 from Zaid.utils import bash
-from pyrogram import Client
+from Zaid.main import bot as Client
 from pyrogram.errors import UserAlreadyParticipant, UserNotParticipant
 from pyrogram.types import InlineKeyboardButton, InlineKeyboardMarkup, Message
 from pytgcalls import StreamType
 from pytgcalls.types.input_stream import AudioPiped
 from youtubesearchpython import VideosSearch
-import yt_dlp as youtube_dl
+from Zaid.Database.clientdb import * 
+from Zaid.Client.assistant import get_assistant_details, random_assistant
+from Zaid.Client.Joiner import AssistantAdd
+from Zaid.Database.active import *
 
-FOREGROUND_IMG = [
+import yt_dlp
+import yt_dlp
+
+ZAID_IMGS = [
+    "Process/ImageFont/LightGreen.png",
     "Process/ImageFont/Red.png",
     "Process/ImageFont/Black.png",
     "Process/ImageFont/Blue.png",
@@ -36,6 +43,7 @@ FOREGROUND_IMG = [
     "Process/ImageFont/Lightblue.png",
     "Process/ImageFont/Lightred.png",
     "Process/ImageFont/Purple.png",
+    "Process/ImageFont/foreground.png",
 ]
 
 def ytsearch(query: str):
@@ -53,11 +61,10 @@ def ytsearch(query: str):
 
 
 async def ytdl(format: str, link: str):
-    stdout, stderr = await bash(f'youtube-dl -g -f "{format}" {link}')
+    stdout, stderr = await bash(f'yt-dlp --geo-bypass -g -f "[height<=?720][width<=?1280]" {link}')
     if stdout:
         return 1, stdout
     return 0, stderr
-
 
 chat_id = None
 DISABLED_GROUPS = []
@@ -107,7 +114,8 @@ async def generate_cover(thumbnail, title, userid, ctitle):
                 await f.write(await resp.read())
                 await f.close()
     image1 = Image.open(f"thumb{userid}.png")
-    image2 = Image.open("Process/ImageFont/raichux.png")
+    images = choice(ZAID_IMGS)
+    image2 = Image.open(images)
     image3 = changeImageSize(1280, 720, image1)
     image4 = changeImageSize(1280, 720, image2)
     image5 = image3.convert("RGBA")
@@ -118,7 +126,7 @@ async def generate_cover(thumbnail, title, userid, ctitle):
     font = ImageFont.truetype("Process/ImageFont/finalfont.ttf", 60)
     font2 = ImageFont.truetype("Process/ImageFont/finalfont.ttf", 70)     
     draw.text((20, 45), f"{title[:30]}...", fill= "white", stroke_width = 1, stroke_fill="white", font=font2)
-    draw.text((120, 595), f"Playing on: {ctitle[:20]}...", fill="white", stroke_width = 1, stroke_fill="white" ,font=font)
+    draw.text((120, 595), f"PlAYING ON: {ctitle[:20]}...", fill="white", stroke_width = 1, stroke_fill="white" ,font=font)
     img.save(f"final{userid}.png")
     os.remove(f"temp{userid}.png")
     os.remove(f"thumb{userid}.png") 
@@ -129,15 +137,18 @@ async def generate_cover(thumbnail, title, userid, ctitle):
 
     
 @Client.on_message(command(["play", f"play@{BOT_USERNAME}"]) & other_filters)
+@AssistantAdd
 async def play(c: Client, m: Message):
     await m.delete()
     replied = m.reply_to_message
     chat_id = m.chat.id
+    _assistant = await get_assistant(chat_id, "assistant")
+    assistant = _assistant["saveassistant"]
     keyboard = InlineKeyboardMarkup(
                   [[
                       InlineKeyboardButton("⏹", callback_data="cbstop"),
                       InlineKeyboardButton("⏸", callback_data="cbpause"),
-                      InlineKeyboardButton('⏭️', callback_data="skip"),
+                      InlineKeyboardButton("⏭️", "skip"),
                       InlineKeyboardButton("▶️", callback_data="cbresume"),
                   ],[
                       InlineKeyboardButton(text="✨ ɢʀᴏᴜᴘ", url=f"https://t.me/{GROUP_SUPPORT}"),
@@ -171,37 +182,6 @@ async def play(c: Client, m: Message):
     if not a.can_invite_users:
         await m.reply_text("missing required permission:" + "\n\n» ❌ __Add users__")
         return
-    try:
-        ubot = (await user.get_me()).id
-        b = await c.get_chat_member(chat_id, ubot)
-        if b.status == "kicked":
-            await m.reply_text(
-                f"@{ASSISTANT_NAME} **is banned in group** {m.chat.title}\n\n» **unban the userbot first if you want to use this bot.**"
-            )
-            return
-    except UserNotParticipant:
-        if m.chat.username:
-            try:
-                await user.join_chat(m.chat.username)
-            except Exception as e:
-                await m.reply_text(f"❌ **userbot failed to join**\n\n**reason**: `{e}`")
-                return
-        else:
-            try:
-                invitelink = await c.export_chat_invite_link(
-                    m.chat.id
-                )
-                if invitelink.startswith("https://t.me/+"):
-                    invitelink = invitelink.replace(
-                        "https://t.me/+", "https://t.me/joinchat/"
-                    )
-                await user.join_chat(invitelink)
-            except UserAlreadyParticipant:
-                pass
-            except Exception as e:
-                return await m.reply_text(
-                    f"❌ **userbot failed to join**\n\n**reason**: `{e}`"
-                )
     if replied:
         if replied.audio or replied.voice:
             suhu = await replied.reply("📥 **downloading audio...**")
@@ -227,13 +207,47 @@ async def play(c: Client, m: Message):
                 )
             else:
              try:
-                await call_py.join_group_call(
-                    chat_id,
-                    AudioPiped(
-                        dl,
-                    ),
-                    stream_type=StreamType().local_stream,
-                )
+                if int(assistant) == 1:
+                   await call_py.join_group_call(
+                       chat_id,
+                       AudioPiped(
+                           dl,
+                       ),
+                       stream_type=StreamType().local_stream,
+                   )
+                if int(assistant) == 2:
+                   await call_py2.join_group_call(
+                       chat_id,
+                       AudioPiped(
+                           dl,
+                       ),
+                       stream_type=StreamType().local_stream,
+                   )
+                if int(assistant) == 3:
+                   await call_py3.join_group_call(
+                       chat_id,
+                       AudioPiped(
+                           dl,
+                       ),
+                       stream_type=StreamType().local_stream,
+                   )
+                if int(assistant) == 4:
+                   await call_py4.join_group_call(
+                       chat_id,
+                       AudioPiped(
+                           dl,
+                       ),
+                       stream_type=StreamType().local_stream,
+                   )
+                if int(assistant) == 5:
+                   await call_py5.join_group_call(
+                       chat_id,
+                       AudioPiped(
+                           dl,
+                       ),
+                       stream_type=StreamType().local_stream,
+                   )
+                await add_active_chat(chat_id)
                 add_to_queue(chat_id, songname, dl, link, "Audio", 0)
                 await suhu.delete()
                 requester = f"[{m.from_user.first_name}](tg://user?id={m.from_user.id})"
@@ -262,7 +276,7 @@ async def play(c: Client, m: Message):
             )
         else:
             suhu = await m.reply_text(
-        f"**Downloading**\n\n20% ▓▓▓▓▓▓▓▓▓▓▓▓ 60%"
+        f"**Downloading**\n\n0% ▓▓▓▓▓▓▓▓▓▓▓▓ 100%"
     )
             query = m.text.split(None, 1)[1]
             search = ytsearch(query)
@@ -278,7 +292,7 @@ async def play(c: Client, m: Message):
                 gcname = m.chat.title
                 ctitle = await CHAT_TITLE(gcname)
                 image = await generate_cover(thumbnail, title, userid, ctitle)
-                format = "bestaudio[ext=m4a]"
+                format = "bestaudio"
                 abhi, ytlink = await ytdl(format, url)
                 if abhi == 0:
                     await suhu.edit(f"💬 yt-dl issues detected\n\n» `{ytlink}`")
@@ -296,14 +310,50 @@ async def play(c: Client, m: Message):
                         )
                     else:
                         try:
-                            await suhu.edit("🔄 **Trying to Join Vc...**")
-                            await call_py.join_group_call(
-                                chat_id,
-                                AudioPiped(
-                                    ytlink,
-                                ),
-                                stream_type=StreamType().local_stream,
-                            )
+                            await suhu.edit(
+                            f"**Downloader**\n\n**Title**: {title[:22]}\n\n100% ████████████100%\n\n**Time Taken**: 00:00 Seconds\n\n**Converting Audio[FFmpeg Process]**"
+                        )
+                            if int(assistant) == 1:
+                               await call_py.join_group_call(
+                                   chat_id,
+                                   AudioPiped(
+                                       ytlink,
+                                   ),
+                                   stream_type=StreamType().local_stream,
+                               )
+                            if int(assistant) == 2:
+                               await call_py2.join_group_call(
+                                   chat_id,
+                                   AudioPiped(
+                                       ytlink,
+                                   ),
+                                   stream_type=StreamType().local_stream,
+                               )
+                            if int(assistant) == 3:
+                               await call_py3.join_group_call(
+                                   chat_id,
+                                   AudioPiped(
+                                       ytlink,
+                                   ),
+                                   stream_type=StreamType().local_stream,
+                               )
+                            if int(assistant) == 4:
+                               await call_py4.join_group_call(
+                                   chat_id,
+                                   AudioPiped(
+                                       ytlink,
+                                   ),
+                                   stream_type=StreamType().local_stream,
+                               )
+                            if int(assistant) == 5:
+                               await call_py5.join_group_call(
+                                   chat_id,
+                                   AudioPiped(
+                                       ytlink,
+                                   ),
+                                   stream_type=StreamType().local_stream,
+                               )
+                            await add_active_chat(chat_id)
                             add_to_queue(chat_id, songname, ytlink, url, "Audio", 0)
                             await suhu.delete()
                             requester = f"[{m.from_user.first_name}](tg://user?id={m.from_user.id})"
