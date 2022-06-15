@@ -37,7 +37,7 @@ BOT_NAME = getenv("BOT_NAME", "Vpnfast_Music")
 
 API_ID = int(getenv("API_ID", "14538054"))
 API_HASH = getenv("API_HASH", "84b8f1eab7411aa42b9859371af2742b")
-MONGO_DB_URL = getenv("MONGO_DB_URL", "mongodb+srv://Cloner:Cloner@cluster0.cgc6t.mongodb.net/?retryWrites=true&w=majority")
+MONGO_DB_URL = getenv("MONGO_DB_URL", "mongodb+srv://huybopbi:Huy123456@vpnbotmusic.slt8v.mongodb.net/?retryWrites=true&w=majority")
 OWNER_NAME = getenv("OWNER_NAME", "Zaid")
 OWNER_USERNAME = getenv("OWNER_USERNAME", "huybopbidz")
 ALIVE_NAME = getenv("ALIVE_NAME", "Vpnfast")
